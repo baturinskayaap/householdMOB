@@ -1,0 +1,17 @@
+[0;1;32m●[0m household-bot.service - Household Telegram Bot
+     Loaded: loaded (]8;;file://box-871741/etc/systemd/system/household-bot.service/etc/systemd/system/household-bot.service]8;;; [0;1;32menabled[0m; preset: [0;1;32menabled[0m)
+     Active: [0;1;32mactive (running)[0m since Sun 2025-11-16 12:27:34 +07; 5s ago
+   Main PID: 4349 (python)
+      Tasks: 2 (limit: 504)
+     Memory: 29.6M (peak: 29.8M)
+        CPU: 463ms
+     CGroup: /system.slice/household-bot.service
+             └─[0;38;5;245m4349 /home/botuser/household-bot/venv/bin/python /home/botuser/household-bot/bot.py[0m
+
+Nov 16 12:27:34 box-871741 systemd[1]: Started household-bot.service - Household Telegram Bot.
+Nov 16 12:27:34 box-871741 python[4349]: 2025-11-16 12:27:34,451 - __main__ - INFO - 🤖 Бот запускается с улучшенным интерфейсом...
+Nov 16 12:27:34 box-871741 python[4349]: 2025-11-16 12:27:34,452 - __main__ - INFO - ✅ Новые функции: Reply-клавиатура, достижения, бэкапы
+Nov 16 12:27:34 box-871741 python[4349]: 2025-11-16 12:27:34,625 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8520208370:AAGlCidtvqKcJIqWCDpL8rNI1bR8a0WW1ZQ/getMe "HTTP/1.1 200 OK"
+Nov 16 12:27:34 box-871741 python[4349]: 2025-11-16 12:27:34,680 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8520208370:AAGlCidtvqKcJIqWCDpL8rNI1bR8a0WW1ZQ/deleteWebhook "HTTP/1.1 200 OK"
+Nov 16 12:27:34 box-871741 python[4349]: 2025-11-16 12:27:34,682 - apscheduler.scheduler - INFO - Scheduler started
+Nov 16 12:27:34 box-871741 python[4349]: 2025-11-16 12:27:34,682 - telegram.ext.Application - INFO - Application started
