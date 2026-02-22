@@ -160,11 +160,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         elif data == "shopping_quick_clear":
             await shopping.quick_clear_all_shopping_items(query, context)
         elif data == "back_to_shopping":
-            # Перенаправляем в главное меню, так как прямого меню покупок больше нет
-            await query.edit_message_text(
-                "👋 Главное меню\n\nВыберите раздел:",
-                reply_markup=get_main_keyboard()
-            )    
+            await shopping.show_shopping_items(query, context)
 
         # ================== ПРОЧЕЕ ==================
         elif data == "cancel_action":
