@@ -4,11 +4,36 @@ import '../models/task.dart';
 import '../models/shopping_item.dart';
 
 class ApiService {
-  static const String baseUrl = 'http://100.109.226.246:8000'; // ваш IP
-  final Dio _dio = Dio(BaseOptions(
+   static const String baseUrl = 'http://10.244.115.212:8000'; // ваш IP
+  final Dio _dio;
+
+  ApiService() : _dio = Dio(BaseOptions(
     baseUrl: baseUrl,
     headers: {'Content-Type': 'application/json'},
-  ));
+  )) {
+    // Добавляем интерцептор для логирования
+    _dio.interceptors.add(InterceptorsWrapper(
+      onRequest: (options, handler) {
+        print('🚀 REQUEST: ${options.method} ${options.path}');
+        print('📤 HEADERS: ${options.headers}');
+        if (options.data != null) {
+          print('📦 DATA: ${options.data}');
+        }
+        return handler.next(options);
+      },
+      onResponse: (response, handler) {
+        print('✅ RESPONSE: ${response.statusCode} ${response.data}');
+        return handler.next(response);
+      },
+      onError: (error, handler) {
+        print('❌ ERROR: ${error.message}');
+        if (error.response != null) {
+          print('📄 ERROR RESPONSE: ${error.response?.data}');
+        }
+        return handler.next(error);
+      },
+    ));
+  }
 
   // Метод для установки chat_id в заголовки
   Future<void> _setChatIdHeader() async {
@@ -22,7 +47,7 @@ class ApiService {
   }
 
   // Задачи
-  Future<List<Task>> getTasks() async {
+  Future<List<Task>> getTasks({required String chatId}) async {
     await _setChatIdHeader();
     final response = await _dio.get('/tasks');
     if (response.statusCode == 200) {
@@ -45,15 +70,13 @@ class ApiService {
     }
   }
 
-  Future<Task> updateTask(int taskId, {String? name, int? intervalDays}) async {
+  Future<void> updateTask({required Task task}) async {
     await _setChatIdHeader();
-    final Map<String, dynamic> data = {};
-    if (name != null) data['name'] = name;
-    if (intervalDays != null) data['interval_days'] = intervalDays;
-    final response = await _dio.patch('/tasks/$taskId', data: data);
-    if (response.statusCode == 200) {
-      return Task.fromJson(response.data);
-    } else {
+    final response = await _dio.put(
+      '/tasks/${task.id}',
+      data: task.toJson(),
+    );
+    if (response.statusCode != 200) {
       throw Exception('Failed to update task');
     }
   }
@@ -69,17 +92,26 @@ class ApiService {
   Future<Task> markTaskDone(int taskId) async {
     await _setChatIdHeader();
     final response = await _dio.post('/tasks/$taskId/done');
+    print('Mark done response: ${response.statusCode} - ${response.data}');
     if (response.statusCode == 200) {
       return Task.fromJson(response.data);
     } else {
-      throw Exception('Failed to mark task done');
+      throw Exception('Failed to mark task done (status ${response.statusCode})');
     }
   }
 
   // Покупки
-  Future<List<ShoppingItem>> getShoppingItems({bool showChecked = true}) async {
+  Future<List<ShoppingItem>> getShoppingItems({
+    bool showChecked = true,
+    String? category, // 'all', 'supermarket', 'household'
+    required String chatId,
+  }) async {
     await _setChatIdHeader();
-    final response = await _dio.get('/shopping', queryParameters: {'show_checked': showChecked});
+    final queryParams = {'show_checked': showChecked.toString()};
+    if (category != null && category != 'all') {
+      queryParams['category'] = category;
+    }
+    final response = await _dio.get('/shopping', queryParameters: queryParams);
     if (response.statusCode == 200) {
       return (response.data as List).map((e) => ShoppingItem.fromJson(e)).toList();
     } else {
@@ -87,9 +119,12 @@ class ApiService {
     }
   }
 
-  Future<ShoppingItem> createShoppingItem(String itemText) async {
+  Future<ShoppingItem> createShoppingItem(String itemText, String category) async {
     await _setChatIdHeader();
-    final response = await _dio.post('/shopping', data: {'item_text': itemText});
+    final response = await _dio.post('/shopping', data: {
+      'item_text': itemText,
+      'category': category,
+    });
     if (response.statusCode == 201) {
       return ShoppingItem.fromJson(response.data);
     } else {

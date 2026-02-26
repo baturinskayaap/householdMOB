@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'screens/login_screen.dart';
-import 'screens/home_screen.dart';
+import 'screens/main_menu_screen.dart'; // новый импорт
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -21,7 +21,7 @@ class MyApp extends StatelessWidget {
       initialRoute: initialRoute,
       routes: {
         '/': (context) => LoginScreen(),
-        '/home': (context) => HomeScreen(),
+        '/home': (context) => MainMenuScreen(), // заменён HomeScreen
       },
     );
   }

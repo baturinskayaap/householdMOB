@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:dio/dio.dart';
+import '../services/api_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -10,24 +12,49 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _controller = TextEditingController();
+  bool _isLoading = false;
 
-  Future<void> _saveChatId() async {
-    final chatId = int.tryParse(_controller.text);
-    if (chatId != null) {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setInt('chat_id', chatId);
-      Navigator.pushReplacementNamed(context, '/home');
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Введите корректный Chat ID')),
+  Future<void> _login() async {
+    final name = _controller.text.trim();
+    if (name.isEmpty) return;
+    setState(() => _isLoading = true);
+    try {
+      final response = await Dio().post(
+        '${ApiService.baseUrl}/login',
+        data: {'name': name},
       );
+      if (response.statusCode == 200) {
+        final chatId = response.data['chat_id'] as int;
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setInt('chat_id', chatId);
+        if (!mounted) return;
+        Navigator.pushReplacementNamed(context, '/home');
+      }
+    } on DioException catch (e) {
+      String errorMsg = 'Ошибка входа';
+      if (e.response?.statusCode == 404) {
+        errorMsg = 'Пользователь не найден';
+      } else if (e.response?.data != null) {
+        errorMsg = e.response?.data['message'] ?? errorMsg;
+      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(errorMsg)),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Ошибка: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Вход')),
+      appBar: AppBar(title: const Text('Вход')),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -35,16 +62,18 @@ class _LoginScreenState extends State<LoginScreen> {
           children: [
             TextField(
               controller: _controller,
-              keyboardType: TextInputType.number,
-              decoration: InputDecoration(
-                labelText: 'Ваш Chat ID',
-                hintText: 'Введите цифровой ID',
+              decoration: const InputDecoration(
+                labelText: 'Ваше имя',
+                hintText: 'Введите имя пользователя',
               ),
+              autofocus: true,
             ),
-            SizedBox(height: 20),
+            const SizedBox(height: 20),
             ElevatedButton(
-              onPressed: _saveChatId,
-              child: Text('Войти'),
+              onPressed: _isLoading ? null : _login,
+              child: _isLoading
+                  ? const CircularProgressIndicator()
+                  : const Text('Войти'),
             ),
           ],
         ),

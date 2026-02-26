@@ -56,18 +56,16 @@ class Task:
 
 @dataclass
 class ShoppingItem:
-    """Модель элемента списка покупок"""
     id: int
     item_text: str
     is_checked: bool
+    category: str  # новое поле
     created_at: datetime
     
     def format_for_display(self) -> str:
-        """Форматирование для отображения в списке"""
         status = "✅" if self.is_checked else "⬜️"
         text = f"<s>{self.item_text}</s>" if self.is_checked else self.item_text
-        return f"{status} {text}"
+        return f"{status} {text} (категория: {self.category})"  # для отладки
     
     def toggle_checked(self) -> None:
-        """Переключить состояние отметки"""
         self.is_checked = not self.is_checked

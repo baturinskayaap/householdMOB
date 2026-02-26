@@ -1,118 +1,145 @@
 import 'package:flutter/material.dart';
-import '../services/api_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/shopping_item.dart';
+import '../services/api_service.dart';
+import 'add_items_screen.dart';
 
 class ShoppingScreen extends StatefulWidget {
   const ShoppingScreen({super.key});
 
   @override
-  _ShoppingScreenState createState() => _ShoppingScreenState();
+  State<ShoppingScreen> createState() => _ShoppingScreenState();
 }
 
 class _ShoppingScreenState extends State<ShoppingScreen> {
-  final ApiService _api = ApiService();
-  late Future<List<ShoppingItem>> _itemsFuture;
-  bool _showChecked = true; // текущий режим отображения
+  final _apiService = ApiService();
+  List<ShoppingItem> _items = [];
+  bool _isLoading = true;
+  String? _error;
+  String _chatId = '';
+  String _selectedFilter = 'all'; // 'all', 'supermarket', 'household'
 
   @override
   void initState() {
     super.initState();
-    _refreshItems();
+    _loadChatIdAndItems();
   }
 
-  void _refreshItems() {
+  Future<void> _loadChatIdAndItems() async {
+    final prefs = await SharedPreferences.getInstance();
+    final chatId = prefs.getInt('chat_id');
+    if (!mounted) return;
     setState(() {
-      _itemsFuture = _api.getShoppingItems(showChecked: _showChecked);
+      _chatId = chatId?.toString() ?? '';
     });
+    await _fetchItems();
   }
 
-  // Переключение режима отображения
-  void _toggleViewMode() {
+  Future<void> _fetchItems() async {
     setState(() {
-      _showChecked = !_showChecked;
-      _itemsFuture = _api.getShoppingItems(showChecked: _showChecked);
+      _isLoading = true;
+      _error = null;
     });
+    try {
+      // Параметр showChecked=true – показываем все, но разделим на две секции сами
+      final items = await _apiService.getShoppingItems(
+        showChecked: true,
+        category: _selectedFilter == 'all' ? null : _selectedFilter,
+        chatId: _chatId,
+      );
+      if (!mounted) return;
+      setState(() {
+        _items = items;
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.toString();
+        _isLoading = false;
+      });
+    }
   }
 
-  // Добавление нового пункта
-  Future<void> _addItem() async {
-    final controller = TextEditingController();
-    final result = await showDialog<bool>(
+  Future<void> _toggleItem(ShoppingItem item) async {
+    try {
+      await _apiService.toggleShoppingItem(item.id);
+      // Обновляем локально, чтобы избежать перезагрузки всего списка
+      setState(() {
+        final index = _items.indexWhere((i) => i.id == item.id);
+        if (index != -1) {
+          _items[index] = item.copyWith(isChecked: !item.isChecked);
+        }
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Ошибка: $e')),
+      );
+    }
+  }
+
+  Future<void> _deleteChecked() async {
+    final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Новый пункт'),
-        content: TextField(
-          controller: controller,
-          decoration: InputDecoration(labelText: 'Название'),
-          autofocus: true,
-        ),
+      builder: (ctx) => AlertDialog(
+        title: const Text('Удалить отмеченные?'),
+        content: const Text('Все отмеченные пункты будут удалены.'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Отмена'),
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Отмена'),
           ),
           ElevatedButton(
-            onPressed: () {
-              if (controller.text.trim().isNotEmpty) {
-                Navigator.pop(context, true);
-              }
-            },
-            child: Text('Добавить'),
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Удалить'),
           ),
         ],
       ),
     );
+    if (confirmed != true) return;
 
-    if (result == true) {
-      final name = controller.text.trim();
-      await _api.createShoppingItem(name);
-      _refreshItems();
+    try {
+      await _apiService.deleteCheckedItems();
+      await _fetchItems(); // перезагружаем список
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Ошибка: $e')),
+      );
     }
   }
 
-  // Переключение отметки пункта
-  Future<void> _toggleItem(int itemId) async {
-    await _api.toggleShoppingItem(itemId);
-    _refreshItems();
-  }
-
-  // Удаление отмеченных пунктов
-  Future<void> _deleteChecked() async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Удалить отмеченные?'),
-        content: Text('Вы уверены? Отмеченные пункты будут удалены.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: Text('Нет')),
-          ElevatedButton(onPressed: () => Navigator.pop(context, true), child: Text('Да')),
-        ],
-      ),
-    );
-
-    if (confirm == true) {
-      await _api.deleteCheckedItems();
-      _refreshItems();
-    }
-  }
-
-  // Удаление всех пунктов
   Future<void> _deleteAll() async {
-    final confirm = await showDialog<bool>(
+    final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Очистить весь список?'),
-        content: Text('Все пункты будут удалены безвозвратно.'),
+      builder: (ctx) => AlertDialog(
+        title: const Text('Удалить всё?'),
+        content: const Text('Все пункты списка покупок будут удалены.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: Text('Нет')),
-          ElevatedButton(onPressed: () => Navigator.pop(context, true), child: Text('Да')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Отмена'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Удалить всё'),
+          ),
         ],
       ),
     );
+    if (confirmed != true) return;
 
-    if (confirm == true) {
-      await _api.deleteAllItems();
-      _refreshItems();
+    try {
+      await _apiService.deleteAllItems();
+      await _fetchItems();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Ошибка: $e')),
+      );
     }
   }
 
@@ -120,83 +147,167 @@ class _ShoppingScreenState extends State<ShoppingScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Список покупок'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text('Список покупок'),
         actions: [
-          // Кнопка переключения режима отображения
           IconButton(
-            icon: Icon(_showChecked ? Icons.visibility : Icons.visibility_off),
-            tooltip: _showChecked ? 'Скрыть отмеченные' : 'Показать все',
-            onPressed: _toggleViewMode,
-          ),
-          // Кнопка удалить отмеченные
-          IconButton(
-            icon: Icon(Icons.clean_hands),
-            tooltip: 'Удалить отмеченные',
+            icon: const Icon(Icons.cleaning_services),
             onPressed: _deleteChecked,
+            tooltip: 'Очистить отмеченные',
           ),
-          // Кнопка удалить все
           IconButton(
-            icon: Icon(Icons.delete_sweep),
-            tooltip: 'Удалить все',
+            icon: const Icon(Icons.delete_sweep),
             onPressed: _deleteAll,
+            tooltip: 'Удалить все',
           ),
         ],
       ),
-      body: FutureBuilder<List<ShoppingItem>>(
-        future: _itemsFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return Center(child: CircularProgressIndicator());
-          } else if (snapshot.hasError) {
-            return Center(child: Text('Ошибка: ${snapshot.error}'));
-          } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.shopping_cart_outlined, size: 80, color: Colors.grey),
-                  SizedBox(height: 16),
-                  Text('Список покупок пуст'),
-                ],
-              ),
-            );
-          } else {
-            final items = snapshot.data!;
-            return ListView.builder(
-              itemCount: items.length,
-              itemBuilder: (context, index) {
-                final item = items[index];
-                return ListTile(
-                  leading: Checkbox(
-                    value: item.isChecked,
-                    onChanged: (_) => _toggleItem(item.id),
-                  ),
-                  title: Text(
-                    item.itemText,
-                    style: item.isChecked
-                        ? TextStyle(decoration: TextDecoration.lineThrough, color: Colors.grey)
-                        : null,
-                  ),
-                  trailing: IconButton(
-                    icon: Icon(Icons.delete_outline),
-                    onPressed: () async {
-                      // Для простоты – сразу переключаем в отмеченные и потом удалим через _deleteChecked,
-                      // но можно реализовать отдельное удаление элемента.
-                      // Пока оставим так: отметим и предложим удалить через общую кнопку.
-                      // Альтернативно: можно добавить Dismissible для удаления свайпом.
-                      await _toggleItem(item.id);
-                    },
-                  ),
-                );
-              },
-            );
-          }
-        },
+      body: Column(
+        children: [
+          // Фильтры по категориям
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                FilterChip(
+                  label: const Text('Все'),
+                  selected: _selectedFilter == 'all',
+                  onSelected: (sel) {
+                    setState(() => _selectedFilter = 'all');
+                    _fetchItems();
+                  },
+                ),
+                const SizedBox(width: 8),
+                FilterChip(
+                  label: const Text('Супермаркет'),
+                  selected: _selectedFilter == 'supermarket',
+                  onSelected: (sel) {
+                    setState(() => _selectedFilter = 'supermarket');
+                    _fetchItems();
+                  },
+                ),
+                const SizedBox(width: 8),
+                FilterChip(
+                  label: const Text('Бытовой'),
+                  selected: _selectedFilter == 'household',
+                  onSelected: (sel) {
+                    setState(() => _selectedFilter = 'household');
+                    _fetchItems();
+                  },
+                ),
+              ],
+            ),
+          ),
+          // Основной список
+          Expanded(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _error != null
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text('Ошибка: $_error'),
+                            ElevatedButton(
+                              onPressed: _fetchItems,
+                              child: const Text('Повторить'),
+                            ),
+                          ],
+                        ),
+                      )
+                    : _buildList(),
+          ),
+        ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _addItem,
-        child: Icon(Icons.add),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+      floatingActionButton: SizedBox(
+        width: double.infinity,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: ElevatedButton(
+            onPressed: () async {
+              final result = await Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const AddItemsScreen()),
+              );
+              // Если добавлен новый элемент – обновить список
+              if (result == true) {
+                _fetchItems();
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+            ),
+            child: const Text('+ Добавить пункты'),
+          ),
+        ),
       ),
     );
+  }
+
+  Widget _buildList() {
+    final unchecked = _items.where((i) => !i.isChecked).toList();
+    final checked = _items.where((i) => i.isChecked).toList();
+
+    return ListView(
+      children: [
+        if (unchecked.isNotEmpty) ...[
+          const Padding(
+            padding: EdgeInsets.all(16.0),
+            child: Text(
+              'Невыполненные',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+          ),
+          ...unchecked.map((item) => _buildItemTile(item)),
+        ],
+        if (checked.isNotEmpty) ...[
+          const Padding(
+            padding: EdgeInsets.all(16.0),
+            child: Text(
+              'Выполненные',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+          ),
+          ...checked.map((item) => _buildItemTile(item, isChecked: true)),
+        ],
+        if (_items.isEmpty)
+          const Center(
+            child: Padding(
+              padding: EdgeInsets.all(32.0),
+              child: Text('Список покупок пуст'),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildItemTile(ShoppingItem item, {bool isChecked = false}) {
+    return CheckboxListTile(
+      title: Text(
+        item.itemText,
+        style: isChecked
+            ? const TextStyle(decoration: TextDecoration.lineThrough)
+            : null,
+      ),
+      subtitle: Text(_categoryName(item.category)),
+      value: item.isChecked,
+      onChanged: (_) => _toggleItem(item),
+    );
+  }
+
+  String _categoryName(String cat) {
+    switch (cat) {
+      case 'supermarket':
+        return 'Супермаркет';
+      case 'household':
+        return 'Бытовой';
+      default:
+        return cat;
+    }
   }
 }
