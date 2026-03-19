@@ -25,8 +25,10 @@ class _LoginScreenState extends State<LoginScreen> {
       );
       if (response.statusCode == 200) {
         final chatId = response.data['chat_id'] as int;
+        final userName = response.data['name'] as String; // имя, которое вернул сервер
         final prefs = await SharedPreferences.getInstance();
         await prefs.setInt('chat_id', chatId);
+        await prefs.setString('username', userName); // <-- сохраняем имя
         if (!mounted) return;
         Navigator.pushReplacementNamed(context, '/home');
       }

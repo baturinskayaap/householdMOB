@@ -26,8 +26,9 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
   Future<void> _loadData() async {
     final prefs = await SharedPreferences.getInstance();
     final chatId = prefs.getInt('chat_id'); // читаем как int
+    final userName = prefs.getString('username');
     setState(() {
-      _userName = chatId?.toString() ?? 'пользователь';
+      _userName = userName?.toString() ?? 'пользователь';
     });
 
     try {

@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
+// import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api_service.dart';
 
-// Простая модель сообщения для чата
 class ChatMessage {
   final String text;
   final bool isUser;
   final DateTime timestamp;
-
   ChatMessage({required this.text, required this.isUser, DateTime? timestamp})
       : timestamp = timestamp ?? DateTime.now();
 }
@@ -21,14 +20,14 @@ class AddItemsScreen extends StatefulWidget {
 class _AddItemsScreenState extends State<AddItemsScreen> {
   final _controller = TextEditingController();
   final List<ChatMessage> _messages = [];
-  String _selectedCategory = 'supermarket'; // 'supermarket' или 'household'
+  String _selectedCategory = 'supermarket';
   late ApiService _apiService;
+  bool _itemsAdded = false; // флаг, были ли добавления
 
   @override
   void initState() {
     super.initState();
     _apiService = ApiService();
-    // Можно добавить приветственное сообщение
     _messages.add(ChatMessage(
       text: 'Введите пункты списка покупок. Они будут добавлены в категорию.',
       isUser: false,
@@ -51,6 +50,7 @@ class _AddItemsScreenState extends State<AddItemsScreen> {
           text: '✅ Добавлено в категорию "${_categoryName(_selectedCategory)}"',
           isUser: false,
         ));
+        _itemsAdded = true; // запоминаем, что было добавление
       });
     } catch (e) {
       setState(() {
@@ -68,77 +68,84 @@ class _AddItemsScreenState extends State<AddItemsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
+    return WillPopScope(
+      onWillPop: () async {
+        // Передаём результат при системном жесте "назад"
+        Navigator.pop(context, _itemsAdded);
+        return false;
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => Navigator.pop(context, _itemsAdded),
+          ),
+          title: const Text('Добавить пункты'),
         ),
-        title: const Text('Добавить пункты'),
-      ),
-      body: Column(
-        children: [
-          // Панель выбора категории
-          Container(
-            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-            color: Colors.grey[200],
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Text('Категория: '),
-                ChoiceChip(
-                  label: const Text('Супермаркет'),
-                  selected: _selectedCategory == 'supermarket',
-                  onSelected: (selected) {
-                    if (selected) setState(() => _selectedCategory = 'supermarket');
-                  },
-                ),
-                const SizedBox(width: 8),
-                ChoiceChip(
-                  label: const Text('Бытовой'),
-                  selected: _selectedCategory == 'household',
-                  onSelected: (selected) {
-                    if (selected) setState(() => _selectedCategory = 'household');
-                  },
-                ),
-              ],
-            ),
-          ),
-          // Список сообщений
-          Expanded(
-            child: ListView.builder(
-              reverse: true, // чтобы новые сообщения были снизу
-              itemCount: _messages.length,
-              itemBuilder: (ctx, index) {
-                final msg = _messages[_messages.length - 1 - index];
-                return _buildMessageBubble(msg);
-              },
-            ),
-          ),
-          // Нижняя панель ввода
-          Container(
-            padding: const EdgeInsets.all(8.0),
-            color: Colors.grey[100],
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _controller,
-                    decoration: const InputDecoration(
-                      hintText: 'Введите пункт...',
-                      border: OutlineInputBorder(),
-                    ),
-                    onSubmitted: (_) => _sendMessage(),
+        body: Column(
+          children: [
+            // Панель выбора категории
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+              color: Colors.grey[200],
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Text('Категория: '),
+                  ChoiceChip(
+                    label: const Text('Супермаркет'),
+                    selected: _selectedCategory == 'supermarket',
+                    onSelected: (selected) {
+                      if (selected) setState(() => _selectedCategory = 'supermarket');
+                    },
                   ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.send),
-                  onPressed: _sendMessage,
-                ),
-              ],
+                  const SizedBox(width: 8),
+                  ChoiceChip(
+                    label: const Text('Бытовой'),
+                    selected: _selectedCategory == 'household',
+                    onSelected: (selected) {
+                      if (selected) setState(() => _selectedCategory = 'household');
+                    },
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+            // Список сообщений
+            Expanded(
+              child: ListView.builder(
+                reverse: true,
+                itemCount: _messages.length,
+                itemBuilder: (ctx, index) {
+                  final msg = _messages[_messages.length - 1 - index];
+                  return _buildMessageBubble(msg);
+                },
+              ),
+            ),
+            // Нижняя панель ввода
+            Container(
+              padding: const EdgeInsets.all(8.0),
+              color: Colors.grey[100],
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _controller,
+                      decoration: const InputDecoration(
+                        hintText: 'Введите пункт...',
+                        border: OutlineInputBorder(),
+                      ),
+                      onSubmitted: (_) => _sendMessage(),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.send),
+                    onPressed: _sendMessage,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

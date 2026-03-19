@@ -59,26 +59,58 @@ class _TasksScreenState extends State<TasksScreen> {
   Map<String, List<Task>> _groupTasksByDate() {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    final overdue = <Task>[];
-    final todayTasks = <Task>[];
-    final upcoming = <Task>[];
+    final tomorrow = today.add(Duration(days: 1));
+
+    final grouped = <String, List<Task>>{};
 
     for (var task in _tasks) {
       final nextDue = task.nextDueDate();
       if (nextDue == null) {
-        overdue.add(task); // никогда не выполнялась
+        // никогда не выполнялась — считаем просроченной?
+        grouped.putIfAbsent('Просрочено', () => []).add(task);
         continue;
       }
       final dueDate = DateTime(nextDue.year, nextDue.month, nextDue.day);
+
       if (dueDate.isBefore(today)) {
-        overdue.add(task);
+        grouped.putIfAbsent('Просрочено', () => []).add(task);
       } else if (dueDate.isAtSameMomentAs(today)) {
-        todayTasks.add(task);
+        grouped.putIfAbsent('Сегодня', () => []).add(task);
+      } else if (dueDate.isAtSameMomentAs(tomorrow)) {
+        grouped.putIfAbsent('Завтра', () => []).add(task);
       } else {
-        upcoming.add(task);
+        final key = '${dueDate.day.toString().padLeft(2, '0')}.${dueDate.month.toString().padLeft(2, '0')}.${dueDate.year}';
+        grouped.putIfAbsent(key, () => []).add(task);
       }
     }
-    return {'Просрочено': overdue, 'Сегодня': todayTasks, 'Предстоящие': upcoming};
+
+    // Сортировка секций: сначала просрочено, потом сегодня, потом завтра, потом остальные по дате.
+    // Для этого нужно упорядочить ключи.
+    // Создадим список всех ключей в правильном порядке.
+    final order = <String>[];
+    if (grouped.containsKey('Просрочено')) order.add('Просрочено');
+    if (grouped.containsKey('Сегодня')) order.add('Сегодня');
+    if (grouped.containsKey('Завтра')) order.add('Завтра');
+
+    // Остальные ключи (даты) отсортируем по возрастанию даты.
+    final dateKeys = grouped.keys.where((key) => !['Просрочено', 'Сегодня', 'Завтра'].contains(key)).toList();
+    dateKeys.sort((a, b) {
+      // парсим дату из строки d.m.y
+      List<int> parseDate(String s) {
+        var parts = s.split('.');
+        return [int.parse(parts[2]), int.parse(parts[1]), int.parse(parts[0])]; // year, month, day
+      }
+      final dateA = parseDate(a);
+      final dateB = parseDate(b);
+      // сравниваем год, месяц, день
+      if (dateA[0] != dateB[0]) return dateA[0].compareTo(dateB[0]);
+      if (dateA[1] != dateB[1]) return dateA[1].compareTo(dateB[1]);
+      return dateA[2].compareTo(dateB[2]);
+    });
+    order.addAll(dateKeys);
+
+    // Возвращаем упорядоченную мапу
+    return Map.fromEntries(order.map((key) => MapEntry(key, grouped[key]!)));
   }
 
   Future<void> _markTaskDone(Task task) async {
@@ -166,7 +198,6 @@ class _TasksScreenState extends State<TasksScreen> {
   }
 
   Widget _buildTaskTile(Task task) {
-    final nextDue = task.nextDueDate();
     final subtitle = StringBuffer();
     if (task.lastDone != null) {
       subtitle.write('Последний раз: ${_formatDate(task.lastDone!)}');
@@ -176,14 +207,8 @@ class _TasksScreenState extends State<TasksScreen> {
     return CheckboxListTile(
       title: Text(task.name),
       subtitle: Text(subtitle.toString()),
-      value: false, // чекбокс всегда неотмечен – нажатие выполняет задачу
+      value: false,
       onChanged: (_) => _markTaskDone(task),
-      secondary: nextDue != null
-          ? Text(
-              '${nextDue.day}.${nextDue.month}',
-              style: const TextStyle(fontSize: 12),
-            )
-          : null,
     );
   }
 

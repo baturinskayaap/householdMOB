@@ -4,7 +4,7 @@ class Task {
   final int intervalDays;
   final DateTime? lastDone;
   final int? lastDoneBy;
-  final DateTime? createdAt;
+  // final DateTime? createdAt;
 
   Task({
     required this.id,
@@ -12,7 +12,7 @@ class Task {
     required this.intervalDays,
     this.lastDone,
     this.lastDoneBy,
-    this.createdAt,
+    // this.createdAt,
   });
 
   factory Task.fromJson(Map<String, dynamic> json) {
@@ -22,19 +22,18 @@ class Task {
       intervalDays: json['interval_days'] as int,
       lastDone: json['last_done'] != null ? DateTime.parse(json['last_done']) : null,
       lastDoneBy: json['last_done_by'] as int?,
-      createdAt: json['created_at'] != null ? DateTime.parse(json['created_at']) : null,
+      // createdAt: json['created_at'] != null ? DateTime.parse(json['created_at']) : null,
     );
   }
-
+// 'created_at': createdAt?.toIso8601String(),
   Map<String, dynamic> toJson() {
     return {
       'id': id,
       'name': name,
       'interval_days': intervalDays,
       'last_done': lastDone?.toIso8601String(),
-      'last_done_by': lastDoneBy,
-      'created_at': createdAt?.toIso8601String(),
-    };
+      'last_done_by': lastDoneBy
+    };      
   }
 
   // Вычисляемое свойство: просрочена ли задача
@@ -79,7 +78,7 @@ class Task {
       intervalDays: intervalDays ?? this.intervalDays,
       lastDone: lastDone ?? this.lastDone,
       lastDoneBy: lastDoneBy ?? this.lastDoneBy,
-      createdAt: createdAt ?? this.createdAt,
+      // createdAt: createdAt ?? this.createdAt,
     );
   }
 }

@@ -4,7 +4,7 @@ import '../models/task.dart';
 import '../models/shopping_item.dart';
 
 class ApiService {
-   static const String baseUrl = 'http://10.244.115.212:8000'; // ваш IP
+   static const String baseUrl = 'http://192.168.137.194:8000'; // ваш IP
   final Dio _dio;
 
   ApiService() : _dio = Dio(BaseOptions(

@@ -62,7 +62,7 @@ def task_to_dict(task: Task) -> dict:
         'interval_days': task.interval_days,
         'last_done': task.last_done.isoformat() if task.last_done else None,
         'last_done_by': task.last_done_by,
-        'created_at': task.created_at.isoformat() if task.created_at else None,
+        # 'created_at': task.created_at.isoformat() if task.created_at else None,
         'is_overdue': task.is_overdue(),
         'days_until_due': task.days_until_due(),
         'days_since_done': task.days_since_done(),
@@ -74,7 +74,7 @@ def shopping_item_to_dict(item: ShoppingItem) -> dict:
         'item_text': item.item_text,
         'is_checked': item.is_checked,
         'category': item.category,
-        'created_at': item.created_at.isoformat() if item.created_at else None,
+        # 'created_at': item.created_at.isoformat() if item.created_at else None,
     }
 
 # ========== Эндпоинты для задач ==========

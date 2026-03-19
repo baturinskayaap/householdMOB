@@ -9,7 +9,7 @@ class Task:
     interval_days: int
     last_done: Optional[datetime] = None
     last_done_by: Optional[int] = None
-    created_at: Optional[datetime] = None
+    # created_at: Optional[datetime] = None
     
     def days_since_done(self) -> Optional[int]:
         if not self.last_done:
@@ -60,7 +60,7 @@ class ShoppingItem:
     item_text: str
     is_checked: bool
     category: str  # новое поле
-    created_at: datetime
+    # created_at: datetime
     
     def format_for_display(self) -> str:
         status = "✅" if self.is_checked else "⬜️"
