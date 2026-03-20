@@ -2,16 +2,16 @@ import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/task.dart';
 import '../models/shopping_item.dart';
+import '../app_config.dart';
 
 class ApiService {
-   static const String baseUrl = 'http://192.168.137.194:8000'; // ваш IP
   final Dio _dio;
 
   ApiService() : _dio = Dio(BaseOptions(
-    baseUrl: baseUrl,
+    baseUrl: AppConfig.baseUrl,
     headers: {'Content-Type': 'application/json'},
   )) {
-    // Добавляем интерцептор для логирования
+    // интерцептор логирования (без изменений)
     _dio.interceptors.add(InterceptorsWrapper(
       onRequest: (options, handler) {
         print('🚀 REQUEST: ${options.method} ${options.path}');
@@ -169,6 +169,16 @@ class ApiService {
       return Map<String, int>.from(response.data);
     } else {
       throw Exception('Failed to get shopping stats');
+    }
+  }
+
+  Future<List<String>> getCategories({required String chatId}) async {
+    await _setChatIdHeader();
+    final response = await _dio.get('/categories');
+    if (response.statusCode == 200) {
+      return List<String>.from(response.data);
+    } else {
+      throw Exception('Failed to load categories');
     }
   }
 }

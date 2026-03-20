@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'screens/login_screen.dart';
-import 'screens/main_menu_screen.dart'; // новый импорт
+import 'screens/main_menu_screen.dart';
+import 'app_config.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await AppConfig.load(); // загружаем сохранённый IP
   final prefs = await SharedPreferences.getInstance();
   final hasChatId = prefs.containsKey('chat_id');
   runApp(MyApp(initialRoute: hasChatId ? '/home' : '/'));
@@ -21,7 +23,7 @@ class MyApp extends StatelessWidget {
       initialRoute: initialRoute,
       routes: {
         '/': (context) => LoginScreen(),
-        '/home': (context) => MainMenuScreen(), // заменён HomeScreen
+        '/home': (context) => MainMenuScreen(),
       },
     );
   }

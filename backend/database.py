@@ -92,18 +92,21 @@ class Database:
                 conn.commit()
 
     def _add_default_user(self):
-        """Добавление пользователя по умолчанию при первом запуске"""
+        """Добавление пользователей по умолчанию при первом запуске"""
+        default_users = [
+            (1, 'настя'),
+            (2, 'костя')
+        ]
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT COUNT(*) FROM users")
             if cursor.fetchone()[0] == 0:
-                cursor.execute(
+                cursor.executemany(
                     "INSERT INTO users (chat_id, username) VALUES (?, ?)",
-                    (1, 'настя')
-                    (2, 'костя')  # можно изменить имя
+                    default_users
                 )
                 conn.commit()
-                logger.info("✅ Создан пользователь по умолчанию: настя")
+                logger.info("✅ Созданы пользователи по умолчанию: настя, костя")
 
     # ================== ПОЛЬЗОВАТЕЛИ ==================
     def get_user_by_name(self, name: str) -> Optional[int]:
@@ -388,3 +391,10 @@ class Database:
         except Exception as e:
             logger.error(f"Error getting item count: {e}")
             return {'total': 0, 'unchecked': 0, 'checked': 0}
+        
+    def get_unique_categories(self) -> List[str]:
+        """Возвращает отсортированный список уникальных категорий."""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT DISTINCT category FROM shopping_items ORDER BY category")
+            return [row[0] for row in cursor.fetchall()]

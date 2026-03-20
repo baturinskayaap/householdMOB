@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/services.dart'; // для SystemNavigator
 import '../services/api_service.dart';
+import '../app_config.dart'; // импортируем конфиг
 import 'tasks_screen.dart';
 import 'shopping_screen.dart';
 
 class MainMenuScreen extends StatefulWidget {
-  const MainMenuScreen({super.key}); // добавили ключ
+  const MainMenuScreen({super.key});
 
   @override
   State<MainMenuScreen> createState() => _MainMenuScreenState();
@@ -25,14 +27,13 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
 
   Future<void> _loadData() async {
     final prefs = await SharedPreferences.getInstance();
-    final chatId = prefs.getInt('chat_id'); // читаем как int
+    final chatId = prefs.getInt('chat_id');
     final userName = prefs.getString('username');
     setState(() {
       _userName = userName?.toString() ?? 'пользователь';
     });
 
     try {
-      // Параллельная загрузка задач и покупок
       final apiService = ApiService();
       final tasks = await apiService.getTasks(chatId: chatId?.toString() ?? '');
       final shopping = await apiService.getShoppingItems(chatId: chatId?.toString() ?? '');
@@ -50,55 +51,116 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
     }
   }
 
+  // Функция показа диалога смены IP
+  Future<void> _showChangeIpDialog() async {
+    final prefs = await SharedPreferences.getInstance();
+    final currentIp = prefs.getString('server_ip') ?? AppConfig.baseUrl;
+    final controller = TextEditingController(text: currentIp);
+
+    return showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Изменить IP сервера'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(
+            labelText: 'IP адрес (с портом)',
+            hintText: 'http://192.168.1.100:8000',
+          ),
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Отмена'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final newIp = controller.text.trim();
+              if (newIp.isNotEmpty) {
+                await AppConfig.save(newIp);
+                if (!mounted) return;
+                // Показываем сообщение и закрываем приложение
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('IP изменён. Приложение будет перезапущено.')),
+                );
+                // Небольшая задержка, чтобы пользователь увидел сообщение
+                await Future.delayed(const Duration(seconds: 2));
+                // Закрываем приложение (только для Android)
+                SystemNavigator.pop();
+              }
+            },
+            child: const Text('Сохранить'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Главное меню')),
+      appBar: AppBar(
+        title: const Text('Главное меню'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.settings),
+            onPressed: _showChangeIpDialog,
+            tooltip: 'Настройки сервера',
+          ),
+        ],
+      ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: _isLoading
-            ? Center(child: CircularProgressIndicator())
+            ? const Center(child: CircularProgressIndicator())
             : Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     'Привет, $_userName',
-                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                    style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                   ),
-                  SizedBox(height: 20),
+                  const SizedBox(height: 20),
                   // Плитка статистики
                   Container(
                     width: double.infinity,
-                    padding: EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
                       color: Colors.blue[100],
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
                       'Всего задач: $_tasksCount, Покупок: $_shoppingCount',
-                      style: TextStyle(fontSize: 18),
+                      style: const TextStyle(fontSize: 18),
                     ),
                   ),
-                  SizedBox(height: 20),
+                  const SizedBox(height: 20),
                   // Две плитки меню
                   Row(
                     children: [
                       Expanded(child: _buildMenuCard(
                         title: 'Задачи',
                         icon: Icons.task,
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => TasksScreen()),
-                        ),
+                        onTap: () async {
+                          await Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => TasksScreen()),
+                          );
+                          if (mounted) _loadData();
+                        },
                       )),
-                      SizedBox(width: 16),
+                      const SizedBox(width: 16),
                       Expanded(child: _buildMenuCard(
                         title: 'Список покупок',
                         icon: Icons.shopping_cart,
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => ShoppingScreen()),
-                        ),
+                        onTap: () async {
+                          await Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => ShoppingScreen()),
+                          );
+                          if (mounted) _loadData();
+                        },
                       )),
                     ],
                   ),
@@ -121,8 +183,8 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(icon, size: 40),
-            SizedBox(height: 8),
-            Text(title, style: TextStyle(fontSize: 18)),
+            const SizedBox(height: 8),
+            Text(title, style: const TextStyle(fontSize: 18)),
           ],
         ),
       ),

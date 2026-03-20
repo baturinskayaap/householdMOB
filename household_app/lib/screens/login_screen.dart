@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:dio/dio.dart';
 import '../services/api_service.dart';
+import '../app_config.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -20,7 +21,7 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _isLoading = true);
     try {
       final response = await Dio().post(
-        '${ApiService.baseUrl}/login',
+        '${AppConfig.baseUrl}/login', // заменили ApiService.baseUrl
         data: {'name': name},
       );
       if (response.statusCode == 200) {

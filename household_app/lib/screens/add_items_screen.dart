@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-// import 'package:shared_preferences/shared_preferences.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api_service.dart';
 
 class ChatMessage {
@@ -20,23 +20,78 @@ class AddItemsScreen extends StatefulWidget {
 class _AddItemsScreenState extends State<AddItemsScreen> {
   final _controller = TextEditingController();
   final List<ChatMessage> _messages = [];
-  String _selectedCategory = 'supermarket';
+  String _selectedCategory = '';
   late ApiService _apiService;
-  bool _itemsAdded = false; // флаг, были ли добавления
+  bool _itemsAdded = false;
+  List<String> _categories = [];
 
   @override
   void initState() {
     super.initState();
     _apiService = ApiService();
+    _loadCategories();
     _messages.add(ChatMessage(
-      text: 'Введите пункты списка покупок. Они будут добавлены в категорию.',
+      text: 'Введите пункты списка покупок. Выберите категорию.',
       isUser: false,
     ));
   }
 
+  Future<void> _loadCategories() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final chatId = prefs.getInt('chat_id')?.toString() ?? '';
+      final cats = await _apiService.getCategories(chatId: chatId);
+      if (!mounted) return;
+      setState(() {
+        _categories = cats;
+        if (_categories.isNotEmpty) _selectedCategory = _categories.first;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      // В случае ошибки (например, нет эндпоинта) используем категории по умолчанию
+      setState(() {
+        _categories = ['supermarket', 'household'];
+        _selectedCategory = 'supermarket';
+      });
+    }
+  }
+
+  Future<void> _createNewCategory() async {
+    final TextEditingController dialogController = TextEditingController();
+    final newCat = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Новая категория'),
+        content: TextField(
+          controller: dialogController,
+          autofocus: true,
+          decoration: const InputDecoration(
+            hintText: 'Введите название категории',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Отмена'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, dialogController.text.trim()),
+            child: const Text('Добавить'),
+          ),
+        ],
+      ),
+    );
+    if (newCat != null && newCat.isNotEmpty && !_categories.contains(newCat)) {
+      setState(() {
+        _categories.add(newCat);
+        _selectedCategory = newCat;
+      });
+    }
+  }
+
   Future<void> _sendMessage() async {
     final text = _controller.text.trim();
-    if (text.isEmpty) return;
+    if (text.isEmpty || _selectedCategory.isEmpty) return;
 
     setState(() {
       _messages.add(ChatMessage(text: text, isUser: true));
@@ -45,14 +100,16 @@ class _AddItemsScreenState extends State<AddItemsScreen> {
 
     try {
       await _apiService.createShoppingItem(text, _selectedCategory);
+      if (!mounted) return;
       setState(() {
         _messages.add(ChatMessage(
-          text: '✅ Добавлено в категорию "${_categoryName(_selectedCategory)}"',
+          text: '✅ Добавлено в категорию "$_selectedCategory"',
           isUser: false,
         ));
-        _itemsAdded = true; // запоминаем, что было добавление
+        _itemsAdded = true;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _messages.add(ChatMessage(
           text: '❌ Ошибка: $e',
@@ -62,15 +119,17 @@ class _AddItemsScreenState extends State<AddItemsScreen> {
     }
   }
 
-  String _categoryName(String cat) {
-    return cat == 'supermarket' ? 'Супермаркет' : 'Бытовой';
+  // Метод для отображения категории (можно доработать под свои нужды)
+  String _displayCategory(String cat) {
+    // Здесь можно добавить маппинг английских названий на русские, если нужно
+    // Например: if (cat == 'supermarket') return 'Супермаркет';
+    return cat; // пока возвращаем как есть
   }
 
   @override
   Widget build(BuildContext context) {
     return WillPopScope(
       onWillPop: () async {
-        // Передаём результат при системном жесте "назад"
         Navigator.pop(context, _itemsAdded);
         return false;
       },
@@ -89,23 +148,28 @@ class _AddItemsScreenState extends State<AddItemsScreen> {
               padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
               color: Colors.grey[200],
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   const Text('Категория: '),
-                  ChoiceChip(
-                    label: const Text('Супермаркет'),
-                    selected: _selectedCategory == 'supermarket',
-                    onSelected: (selected) {
-                      if (selected) setState(() => _selectedCategory = 'supermarket');
-                    },
+                  Expanded(
+                    child: DropdownButton<String>(
+                      value: _selectedCategory.isNotEmpty ? _selectedCategory : null,
+                      isExpanded: true,
+                      hint: const Text('Выберите категорию'),
+                      items: _categories.map((cat) {
+                        return DropdownMenuItem(
+                          value: cat,
+                          child: Text(_displayCategory(cat)),
+                        );
+                      }).toList(),
+                      onChanged: (value) {
+                        setState(() => _selectedCategory = value!);
+                      },
+                    ),
                   ),
-                  const SizedBox(width: 8),
-                  ChoiceChip(
-                    label: const Text('Бытовой'),
-                    selected: _selectedCategory == 'household',
-                    onSelected: (selected) {
-                      if (selected) setState(() => _selectedCategory = 'household');
-                    },
+                  IconButton(
+                    icon: const Icon(Icons.add),
+                    onPressed: _createNewCategory,
+                    tooltip: 'Создать категорию',
                   ),
                 ],
               ),

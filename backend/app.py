@@ -156,6 +156,13 @@ def mark_task_done(task_id, chat_id):
     return jsonify(task_to_dict(updated_task))
 
 # ========== Эндпоинты для покупок ==========
+@app.route('/categories', methods=['GET'])
+@require_chat_id
+def get_categories(chat_id):
+    """Возвращает список всех уникальных категорий покупок."""
+    categories = db.get_unique_categories()
+    return jsonify(categories)
+
 @app.route('/shopping', methods=['GET'])
 @require_chat_id
 def get_shopping_items(chat_id):

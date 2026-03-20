@@ -14,6 +14,7 @@ class ShoppingScreen extends StatefulWidget {
 class _ShoppingScreenState extends State<ShoppingScreen> {
   final _apiService = ApiService();
   List<ShoppingItem> _items = [];
+  List<String> _categories = [];
   bool _isLoading = true;
   String? _error;
   String _chatId = '';
@@ -41,17 +42,21 @@ class _ShoppingScreenState extends State<ShoppingScreen> {
       _error = null;
     });
     try {
-      // Параметр showChecked=true – показываем все, но разделим на две секции сами
+      // Загружаем категории
+      final cats = await _apiService.getCategories(chatId: _chatId);
+      // Загружаем покупки с текущим фильтром
       final items = await _apiService.getShoppingItems(
         showChecked: true,
         category: _selectedFilter == 'all' ? null : _selectedFilter,
         chatId: _chatId,
       );
-      if (!mounted) return;
-      setState(() {
-        _items = items;
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _categories = ['all', ...cats];
+          _items = items;
+          _isLoading = false;
+        });
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -59,6 +64,22 @@ class _ShoppingScreenState extends State<ShoppingScreen> {
         _isLoading = false;
       });
     }
+  }
+
+  Widget _buildFilterChips() {
+    return Wrap(
+      spacing: 8,
+      children: _categories.map((cat) {
+        return FilterChip(
+          label: Text(cat == 'all' ? 'Все' : _categoryName(cat)),
+          selected: _selectedFilter == cat,
+          onSelected: (sel) {
+            setState(() => _selectedFilter = cat);
+            _fetchItems();
+          },
+        );
+      }).toList(),
+    );
   }
 
   Future<void> _toggleItem(ShoppingItem item) async {
@@ -168,38 +189,21 @@ class _ShoppingScreenState extends State<ShoppingScreen> {
       body: Column(
         children: [
           // Фильтры по категориям
+          // Фильтры по категориям
           Container(
             padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                FilterChip(
-                  label: const Text('Все'),
-                  selected: _selectedFilter == 'all',
+            child: Wrap(
+              spacing: 8,
+              children: _categories.map((cat) {
+                return FilterChip(
+                  label: Text(cat == 'all' ? 'Все' : _categoryName(cat)),
+                  selected: _selectedFilter == cat,
                   onSelected: (sel) {
-                    setState(() => _selectedFilter = 'all');
+                    setState(() => _selectedFilter = cat);
                     _fetchItems();
                   },
-                ),
-                const SizedBox(width: 8),
-                FilterChip(
-                  label: const Text('Супермаркет'),
-                  selected: _selectedFilter == 'supermarket',
-                  onSelected: (sel) {
-                    setState(() => _selectedFilter = 'supermarket');
-                    _fetchItems();
-                  },
-                ),
-                const SizedBox(width: 8),
-                FilterChip(
-                  label: const Text('Бытовой'),
-                  selected: _selectedFilter == 'household',
-                  onSelected: (sel) {
-                    setState(() => _selectedFilter = 'household');
-                    _fetchItems();
-                  },
-                ),
-              ],
+                );
+              }).toList(),
             ),
           ),
           // Основной список
@@ -301,13 +305,7 @@ class _ShoppingScreenState extends State<ShoppingScreen> {
   }
 
   String _categoryName(String cat) {
-    switch (cat) {
-      case 'supermarket':
-        return 'Супермаркет';
-      case 'household':
-        return 'Бытовой';
-      default:
-        return cat;
-    }
-  }
+  // Здесь можно добавить маппинг, если нужно, но пока возвращаем как есть
+  return cat;
+}
 }
